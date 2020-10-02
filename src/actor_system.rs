@@ -26,46 +26,52 @@ pub fn start() -> () {
 
 	// start a logging actor
 	let logging_actor = crate::logging_actor::Actor::new();
-	// let tx_to_logging_actor = logging_actor.get_sender();
-	// let rx_from_logging_actor = logging_actor.get_receiver();
 	logging_actor.run();
 
 	// start a pong actor
 	let ponger_actor = crate::pinger_actor::Actor::new(main_sender.clone());
-	// let tx_to_ponger_actor = pinger_actor.get_sender();
-	// let rx_from_ponger_actor = pinger_actor.get_receiver();
 	ponger_actor.run(false);
 
 	// start a pinger actor
 	let pinger_actor = crate::pinger_actor::Actor::new(main_sender.clone());
-	// let tx_to_pinger_actor = pinger_actor.get_sender();
-	// let rx_from_pinger_actor = pinger_actor.get_receiver();
 	pinger_actor.run(true);
 
-
 	// Start Actor System listening inbox
-	// TODO: need to be able to consumer many producers here, not just one
-	// TODO: each new child actor needs to get a copy of actor_system's transmitter
 	let rx_from_all_children: Receiver<MessageRequest> = main_consumer.clone();
-	loop {
-		match rx_from_all_children.recv() {
-			Ok(MessageRequest::Ping) => {
-				// tx_to_logging_actor.send(MessageRequest::LogPrint(format!("[actor_system] received: {:?}", MessageRequest::Ping)));
-				ponger_actor.get_sender().send(MessageRequest::Ping);
-			},
-			Ok(MessageRequest::Pong) => {
-				// tx_to_logging_actor.send(MessageRequest::LogPrint(format!("[actor_system] received: {:?}", MessageRequest::Pong)));
-				pinger_actor.get_sender().send(MessageRequest::Pong);
-			},
-			Ok(MessageRequest::LogPrint(msg)) => {
-				logging_actor.get_sender().send(MessageRequest::LogPrint(msg));
-			},
-			Ok(response_message) => {
-				logging_actor.get_sender().send(MessageRequest::LogPrint(format!("[actor_system] misc message: {:?}", response_message)));
-			},
-			Err(e) => {
-				println!("[main listener] error receiving from switchboard");
+
+	let ping = pinger_actor.get_sender();
+	let pong = ponger_actor.get_sender();
+	let logger = logging_actor.get_sender();
+	spawn(move || {
+		loop {
+			match rx_from_all_children.recv() {
+				Ok(MessageRequest::Ping) => {
+					// tx_to_logging_actor.send(MessageRequest::LogPrint(format!("[actor_system] received: {:?}", MessageRequest::Ping)));
+					pong.send(MessageRequest::Ping);
+				},
+				Ok(MessageRequest::Pong) => {
+					// tx_to_logging_actor.send(MessageRequest::LogPrint(format!("[actor_system] received: {:?}", MessageRequest::Pong)));
+					ping.send(MessageRequest::Pong);
+				},
+				Ok(MessageRequest::LogPrint(msg)) => {
+					logger.send(MessageRequest::LogPrint(msg));
+				},
+				Ok(response_message) => {
+					logger.send(MessageRequest::LogPrint(format!("[actor_system] misc message: {:?}", response_message)));
+				},
+				Err(e) => {
+					println!("[main listener] error receiving from switchboard");
+				}
 			}
 		}
-	}
+	});
+
+
+	// loop{};
+	sleep(Duration::from_secs(10));
+	ponger_actor.get_sender().send(MessageRequest::Stop);
+	sleep(Duration::from_secs(5));
+	pinger_actor.get_sender().send(MessageRequest::Stop);
+	logging_actor.get_sender().send(MessageRequest::Stop);
+
 }

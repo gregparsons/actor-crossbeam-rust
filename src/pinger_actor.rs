@@ -6,28 +6,24 @@ use std::thread::{spawn, sleep};
 use crate::actor::{MessageRequest, ActorState, State};
 
 pub struct Actor {
-
-	// owned by main thread but cloneable vi/**/a crossbeam_channel
 	inbound_multi_producer:crossbeam_channel::Sender<MessageRequest>,
 	inbound_single_consumer:crossbeam_channel::Receiver<MessageRequest>,
-
-	// probably don't need this, just need parent's
-	outbound_multi_producer:crossbeam_channel::Sender<MessageRequest>,
-	outbound_single_consumer:crossbeam_channel::Receiver<MessageRequest>,
-
-	parent_tx:crossbeam_channel::Sender<MessageRequest>,
-
+	pub parent_tx:crossbeam_channel::Sender<MessageRequest>,
 }
 
 impl Actor {
 	pub fn new(parent_tx_new: crossbeam_channel::Sender<MessageRequest>)-> Actor {
+
 		let mut inbound_channel = crossbeam_channel::unbounded();
-		let mut outbound_channel = crossbeam_channel::unbounded();
+
 		let new_actor = Actor {
-			inbound_multi_producer: inbound_channel.0,
+			// listen on this:
 			inbound_single_consumer: inbound_channel.1,
-			outbound_multi_producer: outbound_channel.0,
-			outbound_single_consumer: outbound_channel.1,
+
+			// give out clones of this to anyone who wants to talk to us:
+			inbound_multi_producer: inbound_channel.0,
+
+			// talk to the operator on this:
 			parent_tx : parent_tx_new,
 		};
 		new_actor
@@ -38,43 +34,41 @@ impl Actor {
 		self.inbound_multi_producer.clone()
 	}
 
-	// Give me a way to send messages TO the main thread
-	pub fn get_receiver(&self) -> Receiver<MessageRequest>{
-		self.outbound_single_consumer.clone()
-	}
-
 	pub fn run(&self, is_ping:bool){
-		// this uses this to listen
-		let single_consumer_clone = self.inbound_single_consumer.clone();
-		let outbound_multiproducer = self.outbound_multi_producer.clone();
-
+		self.do_one_time_work(is_ping);
+		self.listen();
+	}
+	
+	fn do_one_time_work(& self, is_ping:bool){
 		// Do Work Here
 		// Spawns a pinger infinite loop
-		// TODO: spawn as thread, send message to stop?
 		if(is_ping) {
-			// Should we send pings? If false, then just listen and send pongs.
-			let parent_tx_clone = self.parent_tx.clone();
 			{
 				// Send a periodic PING expecting a PONG back
 				let ticker: crossbeam_channel::Receiver<Instant> = tick(Duration::from_millis(500));
-				let tx = outbound_multiproducer.clone();
+				let parent_tx_clone = self.parent_tx.clone();
 				let ping_thread = spawn(move || {
 					loop {
+
 						crossbeam_channel::select! {
-						recv(ticker) -> _ => {
-							parent_tx_clone.send(MessageRequest::Ping);
+							recv(ticker) -> _ => {
+								//self::parent_tx.send(MessageRequest::Ping);
+								parent_tx_clone.send(MessageRequest::Ping);
+
+							}
 						}
-					}
 					}
 				});
 			}
 		}
+	}
 
-
-		let parent_tx_clone2 = self.parent_tx.clone();
+	fn listen(&self){
+		let rx = self.inbound_single_consumer.clone();
+		let parent_tx = self.parent_tx.clone();
 		spawn(move ||{
 			loop {
-				match single_consumer_clone.recv() {
+				match rx.recv() {
 					Ok(m) => {
 						//println!("[listen] receive ok: {:?}", m);
 						match m {
@@ -84,27 +78,22 @@ impl Actor {
 							},
 							MessageRequest::Stop => {
 								println!("[listen] received Message::Stop");
-								// c_state.a_state.store(State::Stopped);
+								return;
 							},
 							MessageRequest::Ping => {
 								// If you got a ping, log it, and reply with a pong.
 								// println!("[listen] received ping, sending pong {:?}", MessageRequest::Ping);
-								parent_tx_clone2.send(MessageRequest::LogPrint("[pinger] ping".to_string()));
-								parent_tx_clone2.send(MessageRequest::Pong);
-
+								parent_tx.send(MessageRequest::LogPrint("[pinger] ping".to_string()));
+								parent_tx.send(MessageRequest::Pong);
 							},
 							MessageRequest::Pong => {
 								// If you got a pong, stop the madness and log it.
 								// println!("[listen] received pong, sending log message");
-								parent_tx_clone2.send(MessageRequest::LogPrint("[ponger] pong".to_string()));
-
+								parent_tx.send(MessageRequest::LogPrint("[ponger] pong".to_string()));
 							},
-
 							_ => {
 								println!("[pinger_actor] Message: Unknown" );
 							}
-							// exhaustive of enum options
-
 						}
 					},
 					Err(_) => {
