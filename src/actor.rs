@@ -7,7 +7,7 @@ use std::thread::{spawn, sleep};
 
 
 #[derive(Debug)]
-pub enum MessageRequest {
+pub enum MsgActor {
 	Start,
 	Stop,
 	Ping,
@@ -29,10 +29,10 @@ pub struct ActorState {
 pub struct Actor {
 
 	// owned by main thread but cloneable via crossbeam_channel
-	inbound_multi_producer:crossbeam_channel::Sender<MessageRequest>,
-	inbound_single_consumer:crossbeam_channel::Receiver<MessageRequest>,
-	outbound_multi_producer:crossbeam_channel::Sender<MessageRequest>,
-	outbound_single_consumer:crossbeam_channel::Receiver<MessageRequest>,
+	inbound_multi_producer:crossbeam_channel::Sender<MsgActor>,
+	inbound_single_consumer:crossbeam_channel::Receiver<MsgActor>,
+	outbound_multi_producer:crossbeam_channel::Sender<MsgActor>,
+	outbound_single_consumer:crossbeam_channel::Receiver<MsgActor>,
 
 }
 
@@ -50,12 +50,12 @@ impl Actor {
 	}
 
 	// Give the main thread a way to send messages TO me
-	pub fn get_sender(&self) -> Sender<MessageRequest>{
+	pub fn get_sender(&self) -> Sender<MsgActor>{
 		self.inbound_multi_producer.clone()
 	}
 
 	// Give me a way to send messages TO the main thread
-	pub fn get_receiver(&self) -> Receiver<MessageRequest>{
+	pub fn get_receiver(&self) -> Receiver<MsgActor>{
 		self.outbound_single_consumer.clone()
 	}
 
@@ -87,21 +87,21 @@ impl Actor {
 					Ok(m) => {
 						//println!("[listen] receive ok: {:?}", m);
 						match m {
-							MessageRequest::Start => {
+							MsgActor::Start => {
 								println!("[listen] received Message::Start");
 								c_state.a_state.store(State::Started);
 							},
-							MessageRequest::Stop => {
+							MsgActor::Stop => {
 								println!("[listen] received Message::Stop");
 								c_state.a_state.store(State::Stopped);
 							},
-							MessageRequest::Ping => {
+							MsgActor::Ping => {
 
 								use core::borrow::Borrow;
 								println!("[listen] received Message::Ping; status {:?}",c_state.a_state.borrow().load());
 
 								// TODO: send a message back
-								outbound_multiproducer.send(MessageRequest::Pong);
+								outbound_multiproducer.send(MsgActor::Pong);
 
 							}
 							_ => {
