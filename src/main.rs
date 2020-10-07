@@ -2,6 +2,8 @@
 
 	A rudimentary actor system in Rust. Very rudimentary.
 
+	Use: crossbeam to effect minimal actors as threads
+
 	Actors are long-running threads and communicate over Crossbeam unbounded channels.
 
 	The idea is to ingest a streaming data feed say from a websocket then persist the data
