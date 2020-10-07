@@ -1,51 +1,34 @@
 
 
 use crossbeam_utils::atomic::AtomicCell;
-use std::time::{Duration, Instant};
-use crossbeam_channel::{after, tick, Sender, Receiver};
-use std::thread::{spawn, sleep};
+use crossbeam_channel::{Sender, Receiver};
+use std::thread::{spawn};
+use crate::actor_tools::MsgActor;
 
 
-#[derive(Debug)]
-pub enum MsgActor {
-	Start,
-	Stop,
-	Pause,
-	Ping,
-	Pong,
-	LogPrint(String),
-
-}
-
-
-#[derive(Debug, Copy, Clone)]
-pub enum State {
-	Started, Stopped
-}
-
-pub struct ActorState {
-	pub a_state:crossbeam_utils::atomic::AtomicCell<State>
-}
 
 pub struct Actor {
 
-	// owned by main thread but cloneable via crossbeam_channel
+	name:String,
 	inbound_multi_producer:crossbeam_channel::Sender<MsgActor>,
 	inbound_single_consumer:crossbeam_channel::Receiver<MsgActor>,
-	outbound_multi_producer:crossbeam_channel::Sender<MsgActor>,
-	outbound_single_consumer:crossbeam_channel::Receiver<MsgActor>,
+	pub parent_tx:Sender<MsgActor>,
+	pub logger_tx:Sender<MsgActor>,
 
 }
 
 impl Actor {
-	pub fn new()-> Actor {
-		let mut inbound_channel = crossbeam_channel::unbounded();
-		let mut outbound_channel = crossbeam_channel::unbounded();
+	pub fn new (actor_name: String, parent_tx_new: Sender<MsgActor>, logging_tx:Sender<MsgActor>) -> Actor {
+		let inbound_channel = crossbeam_channel::unbounded();
 		let new_actor = Actor {
-			inbound_multi_producer: inbound_channel.0,
+			name : actor_name,
+			// listen on this:
 			inbound_single_consumer: inbound_channel.1,
-			outbound_multi_producer: outbound_channel.0,
-			outbound_single_consumer: outbound_channel.1,
+			// give out clones of this to anyone who wants to talk to us:
+			inbound_multi_producer: inbound_channel.0,
+			// talk to the operator on this:
+			parent_tx : parent_tx_new,
+			logger_tx : logging_tx,
 		};
 		new_actor
 	}
@@ -55,16 +38,11 @@ impl Actor {
 		self.inbound_multi_producer.clone()
 	}
 
-	// Give me a way to send messages TO the main thread
-	pub fn get_receiver(&self) -> Receiver<MsgActor>{
-		self.outbound_single_consumer.clone()
-	}
-
 	pub fn run(&self){
 		// this uses this to listen
 		let single_consumer_clone = self.inbound_single_consumer.clone();
 
-		let outbound_multiproducer = self.outbound_multi_producer.clone();
+		// let outbound_multiproducer = self.inbound_multi_producer.clone();
 
 
 		/*
@@ -78,10 +56,11 @@ impl Actor {
 			message to/fro.
 
 		 */
-		let c_state = ActorState {
-			a_state:AtomicCell::new(State::Stopped),
-		};
+		// let c_state = ActorState {
+		// 	a_state:AtomicCell::new(State::Stopped),
+		// };
 
+		let parent_tx = self.parent_tx.clone();
 		spawn(move ||{
 			loop {
 				match single_consumer_clone.recv() {
@@ -90,19 +69,19 @@ impl Actor {
 						match m {
 							MsgActor::Start => {
 								println!("[listen] received Message::Start");
-								c_state.a_state.store(State::Started);
+								// c_state.a_state.store(State::Started);
 							},
 							MsgActor::Stop => {
 								println!("[listen] received Message::Stop");
-								c_state.a_state.store(State::Stopped);
+								// c_state.a_state.store(State::Stopped);
 							},
 							MsgActor::Ping => {
 
 								use core::borrow::Borrow;
-								println!("[listen] received Message::Ping; status {:?}",c_state.a_state.borrow().load());
+								// println!("[listen] received Message::Ping; status {:?}",c_state.a_state.borrow().load());
 
 								// TODO: send a message back
-								outbound_multiproducer.send(MsgActor::Pong);
+								let _ = parent_tx.send(MsgActor::Pong);
 
 							}
 							_ => {

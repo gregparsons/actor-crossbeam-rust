@@ -20,22 +20,31 @@
 */
 
 
-use std::time::{Duration, Instant};
-use crossbeam_channel::{after, tick, Sender, Receiver, unbounded};
-use std::thread::{spawn, sleep};
-use crate::actor::{MsgActor};
+use crossbeam_channel::{Sender, Receiver};
+use std::thread::{spawn};
+use crate::actor_tools::MsgActor;
 
 pub fn start() -> () {
 
 	// Main Comms channel: only this "actor" can receive but there can be many copies given out to subordinates
-	let (main_sender, main_consumer):(Sender<MsgActor>, Receiver<MsgActor>) = unbounded();
+	let (main_sender, main_consumer):(Sender<MsgActor>, Receiver<MsgActor>) = crossbeam_channel::unbounded();
 
 	// // start a logging actor
 	let logging_actor = crate::logging_actor::Actor::new("logger".to_string(), main_sender.clone());
 	logging_actor.run();
 
-	let ticker_actor = crate::ticker_actor::Actor::new("ticker".to_string(), main_sender.clone(), logging_actor.get_sender());
+
+
+
+	let url_sandbox = "wss://ws-feed-public.sandbox.pro.coinbase.com".to_string(); //std::env::var("COINBASE_URL").expect("COINBASE_URL must be set");
+	let url_pro = "wss://ws-feed.pro.coinbase.com".to_string(); // std::env::var("COINBASE_URL").expect("COINBASE_URL must be set");
+
+	let ticker_actor = crate::ticker_actor::Actor::new("ticker_sand".to_string(), url_sandbox, main_sender.clone(), logging_actor.get_sender());
 	ticker_actor.run();
+
+	let ticker_actor = crate::ticker_actor::Actor::new("ticker_pro".to_string(), url_pro, main_sender.clone(), logging_actor.get_sender());
+	ticker_actor.run();
+
 
 	// // start pong actor
 	// let ponger_actor = crate::pinger_actor::Actor::new(
@@ -70,28 +79,28 @@ pub fn start() -> () {
 				// Ok(MsgActor::LogPrint(msg)) => {
 				// 	logger.send(MsgActor::LogPrint(msg));
 				// },
-				Ok(msg) => {
+				Ok(_msg) => {
 					// logger.send(MsgActor::LogPrint(format!("[actor_system] misc message: {:?}", msg)));
 				}
-				Err(e) => {
+				_ => {
 					println!("[ActorSystem] error receiving from switchboard");
 				}
 			}
 		}
 	});
 
-	// loop{};
-	sleep(Duration::from_secs(20));
-	// ponger_actor.get_sender().send(MsgActor::Stop);
-	// sleep(Duration::from_secs(5));
-	// pinger_actor.get_sender().send(MsgActor::Stop);
-	//logging_actor.get_sender().send(MsgActor::Stop);
-	ticker_actor.get_sender().send(MsgActor::Pause);
-	sleep(Duration::from_secs(10));
-	ticker_actor.get_sender().send(MsgActor::Start);
-	sleep(Duration::from_secs(15));
-	ticker_actor.get_sender().send(MsgActor::Stop);
-	sleep(Duration::from_secs(15));
+	loop{};
+	// sleep(Duration::from_secs(20));
+	// // ponger_actor.get_sender().send(MsgActor::Stop);
+	// // sleep(Duration::from_secs(5));
+	// // pinger_actor.get_sender().send(MsgActor::Stop);
+	// //logging_actor.get_sender().send(MsgActor::Stop);
+	// ticker_actor.get_sender().send(MsgActor::Pause);
+	// sleep(Duration::from_secs(10));
+	// ticker_actor.get_sender().send(MsgActor::Start);
+	// sleep(Duration::from_secs(15));
+	// ticker_actor.get_sender().send(MsgActor::Stop);
+	// sleep(Duration::from_secs(15));
 
 
 }

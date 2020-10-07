@@ -1,9 +1,8 @@
 
-use crossbeam_utils::atomic::AtomicCell;
 use std::time::{Duration, Instant};
-use crossbeam_channel::{after, tick, Sender, Receiver};
-use std::thread::{spawn, sleep};
-use crate::actor::{MsgActor, ActorState, State};
+use crossbeam_channel::{Sender, Receiver};
+use std::thread::{spawn};
+use crate::actor_tools::MsgActor;
 
 pub struct Actor {
 
@@ -18,7 +17,7 @@ pub struct Actor {
 impl Actor {
 
 	pub fn new (actor_name: String, parent_tx_new: Sender<MsgActor>, logging_tx:Sender<MsgActor>) -> Actor {
-		let mut inbound_channel = crossbeam_channel::unbounded();
+		let inbound_channel = crossbeam_channel::unbounded();
 		let new_actor = Actor {
 			name : actor_name,
 			// listen on this:
@@ -43,17 +42,17 @@ impl Actor {
 	}
 
 	fn do_one_time_work(& self, is_ping:bool){
-		if(is_ping) {
+		if is_ping  {
 			{
 				// Send a periodic PING expecting a PONG back
-				let ticker: Receiver<Instant> = tick(Duration::from_millis(500));
+				let ticker: Receiver<Instant> = crossbeam_channel::tick(Duration::from_millis(500));
 				let parent_tx_clone = self.parent_tx.clone();
-				let ping_thread = spawn(move || {
+				spawn(move || {
 					loop {
 						crossbeam_channel::select! {
 							recv(ticker) -> _ => {
 								//self::parent_tx.send(MessageRequest::Ping);
-								parent_tx_clone.send(MsgActor::Ping);
+								let _ = parent_tx_clone.send(MsgActor::Ping);
 
 							}
 						}
@@ -86,14 +85,14 @@ impl Actor {
 								// println!("[listen] received ping, sending pong {:?}", MessageRequest::Ping);
 
 
-								logger_tx.send(MsgActor::LogPrint("[pinger-direct-to-logger] ping".to_string()));
-								parent_tx.send(MsgActor::LogPrint("[pinger] ping".to_string()));
-								parent_tx.send(MsgActor::Pong);
+								let _ = logger_tx.send(MsgActor::LogPrint("[pinger-direct-to-logger] ping".to_string()));
+								let _ = parent_tx.send(MsgActor::LogPrint("[pinger] ping".to_string()));
+								let _ = parent_tx.send(MsgActor::Pong);
 							},
 							MsgActor::Pong => {
 								// If you got a pong, stop the madness and log it.
 								// println!("[listen] received pong, sending log message");
-								parent_tx.send(MsgActor::LogPrint("[ponger] pong".to_string()));
+								let _ = parent_tx.send(MsgActor::LogPrint("[ponger] pong".to_string()));
 							},
 							_ => {
 								println!("[pinger_actor] Message: Unknown" );

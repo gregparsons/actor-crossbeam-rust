@@ -1,10 +1,10 @@
 
 
-use crossbeam_utils::atomic::AtomicCell;
-use std::time::{Duration, Instant};
-use crossbeam_channel::{after, tick, Sender, Receiver};
-use std::thread::{spawn, sleep};
-use crate::actor::{MsgActor, ActorState, State};
+// use crossbeam_utils::atomic::AtomicCell;
+
+use crossbeam_channel::{Sender};
+use std::thread::{spawn};
+use crate::actor_tools::MsgActor;
 
 pub struct Actor {
 
@@ -18,7 +18,7 @@ pub struct Actor {
 
 impl Actor {
 	pub fn new(actor_name:String, parent_tx_new: Sender<MsgActor>) -> Actor {
-		let mut inbound_channel = crossbeam_channel::unbounded();
+		let inbound_channel = crossbeam_channel::unbounded();
 		// let mut outbound_channel = crossbeam_channel::unbounded();
 		let new_actor = Actor {
 			name : actor_name,
@@ -42,9 +42,9 @@ impl Actor {
 		// this uses this to listen
 		let single_consumer_clone = self.inbound_single_consumer.clone();
 
-		let c_state = ActorState {
-			a_state:AtomicCell::new(State::Stopped),
-		};
+		// let c_state = ActorState {
+		// 	a_state:AtomicCell::new(State::Stopped),
+		// };
 
 		spawn(move ||{
 			loop {
@@ -53,11 +53,11 @@ impl Actor {
 						match m {
 							MsgActor::Start => {
 								println!("[listen] received Message::Start");
-								c_state.a_state.store(State::Started);
+								// c_state.a_state.store(State::Started);
 							},
 							MsgActor::Stop => {
 								println!("[listen] received Message::Stop");
-								c_state.a_state.store(State::Stopped);
+								// c_state.a_state.store(State::Stopped);
 							},
 							MsgActor::LogPrint(msg) => {
 								println!("[logging_actor] LogPrint: {}", &msg);
