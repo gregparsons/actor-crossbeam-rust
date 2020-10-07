@@ -30,62 +30,64 @@ pub fn start() -> () {
 	// Main Comms channel: only this "actor" can receive but there can be many copies given out to subordinates
 	let (main_sender, main_consumer):(Sender<MsgActor>, Receiver<MsgActor>) = unbounded();
 
-	// start a logging actor
-	let logging_actor = crate::logging_actor::Actor::new("logger".to_string(), main_sender.clone());
-	logging_actor.run();
+	// // start a logging actor
+	// let logging_actor = crate::logging_actor::Actor::new("logger".to_string(), main_sender.clone());
+	// logging_actor.run();
 
-	// start a pong actor
-	let ponger_actor = crate::pinger_actor::Actor::new(
-		"ponger".to_string(),
-		main_sender.clone(),
-		logging_actor.get_sender()
-	);
-	ponger_actor.run(false);
+	let ticker_actor = crate::ticker_actor::Actor::new("ticker".to_string(), main_sender.clone() );
+	ticker_actor.run();
 
-	// start a pinger actor
-	let pinger_actor = crate::pinger_actor::Actor::new(
-		"pinger".to_string(),
-		main_sender.clone(),
-		logging_actor.get_sender()
-	);
-	pinger_actor.run(true);
+	// // start pong actor
+	// let ponger_actor = crate::pinger_actor::Actor::new(
+	// 	"ponger".to_string(),
+	// 	main_sender.clone(),
+	// 	logging_actor.get_sender()
+	// );
+	// ponger_actor.run(false);
+	//
+	// // start ping actor
+	// let pinger_actor = crate::pinger_actor::Actor::new(
+	// 	"pinger".to_string(),
+	// 	main_sender.clone(),
+	// 	logging_actor.get_sender()
+	// );
+	// pinger_actor.run(true);
 
-	// Start Actor System listening inbox
-	let rx_from_all_children: Receiver<MsgActor> = main_consumer.clone();
-
-	let ping = pinger_actor.get_sender();
-	let pong = ponger_actor.get_sender();
-	let logger = logging_actor.get_sender();
+	// Start Actor System listener thread
+	let rx_system: Receiver<MsgActor> = main_consumer.clone();
+	// let ping = pinger_actor.get_sender();
+	// let pong = ponger_actor.get_sender();
+	// let logger = logging_actor.get_sender();
 	spawn(move || {
 		loop {
-			match rx_from_all_children.recv() {
-				Ok(MsgActor::Ping) => {
-					// tx_to_logging_actor.send(MessageRequest::LogPrint(format!("[actor_system] received: {:?}", MessageRequest::Ping)));
-					pong.send(MsgActor::Ping);
-				},
-				Ok(MsgActor::Pong) => {
-					// tx_to_logging_actor.send(MessageRequest::LogPrint(format!("[actor_system] received: {:?}", MessageRequest::Pong)));
-					ping.send(MsgActor::Pong);
-				},
-				Ok(MsgActor::LogPrint(msg)) => {
-					logger.send(MsgActor::LogPrint(msg));
-				},
-				Ok(response_message) => {
-					logger.send(MsgActor::LogPrint(format!("[actor_system] misc message: {:?}", response_message)));
-				},
+			match rx_system.recv() {
+				// Ok(MsgActor::Ping) => {
+				// 	pong.send(MsgActor::Ping);
+				// },
+				// Ok(MsgActor::Pong) => {
+				// 	ping.send(MsgActor::Pong);
+				// },
+				// Ok(MsgActor::LogPrint(msg)) => {
+				// 	logger.send(MsgActor::LogPrint(msg));
+				// },
+				Ok(msg) => {
+					// logger.send(MsgActor::LogPrint(format!("[actor_system] misc message: {:?}", msg)));
+				}
 				Err(e) => {
-					println!("[main listener] error receiving from switchboard");
+					println!("[ActorSystem] error receiving from switchboard");
 				}
 			}
 		}
 	});
 
-
 	// loop{};
-	sleep(Duration::from_secs(10));
-	ponger_actor.get_sender().send(MsgActor::Stop);
-	sleep(Duration::from_secs(5));
-	pinger_actor.get_sender().send(MsgActor::Stop);
-	logging_actor.get_sender().send(MsgActor::Stop);
+	sleep(Duration::from_secs(20));
+	// ponger_actor.get_sender().send(MsgActor::Stop);
+	// sleep(Duration::from_secs(5));
+	// pinger_actor.get_sender().send(MsgActor::Stop);
+	//logging_actor.get_sender().send(MsgActor::Stop);
+	ticker_actor.get_sender().send(MsgActor::Stop);
+	sleep(Duration::from_secs(2));
+
 
 }

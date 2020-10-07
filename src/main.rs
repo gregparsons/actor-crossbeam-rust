@@ -1,3 +1,4 @@
+mod ticker_actor;
 /**
 
 	A rudimentary actor system in Rust. Very rudimentary.
@@ -27,70 +28,7 @@ mod actor_system;
 mod actor;
 mod logging_actor;
 
-// https://docs.rs/crossbeam/0.7.3/crossbeam/channel/index.html
-// https://docs.rs/crossbeam-channel/0.4.4/crossbeam_channel/
-
 fn main() {
-	/*
-	/**************************************************/
-	println!("Bounded demo: ");
-	let (s1, r1) = bounded(0);
-	let (s2, r2) = (s1.clone(), r1.clone());
-
-	// Spawn a thread that receives a message and then sends one.
-	std::thread::spawn(move || {
-		let rcvd = r2.recv().unwrap();
-		println!("received: {}", rcvd);
-		s2.send(2).unwrap();
-	});
-
-	// Send a message and then receive one.
-	s1.send(1).unwrap();
-	let rcvd = r1.recv().unwrap();
-	println!("received: {}", rcvd);
-
-
-
-	/**************************************************/
-	println!("Unbounded demo: ");
-
-	// Create a channel of unbounded capacity.
-	let (s, r) = unbounded();
-
-	// Receive the message from the channel.
-	std::thread::spawn(move||{
-		println!("spawned thread. assert...");
-		// blocks on recv()
-		assert_eq!(r.recv(), Ok("Hello, world!"));
-	});
-
-	std::thread::sleep(std::time::Duration::from_millis(2000));
-
-	// Send a message into the channel.
-	s.send("Hello, world!").unwrap();
-
-
-	/**************************************************/
-	println!("Ticker demo: ");
-
-	// Ticker
-	let start = Instant::now();
-	let ticker:crossbeam_channel::Receiver<Instant> = tick(Duration::from_millis(200));
-	let timeout = after(Duration::from_secs(10));
-
-	// move forces the thread closure to own ticker and timeout
-	spawn(move || {
-		loop {
-			crossbeam_channel::select! {
-				recv(ticker) -> _ => println!("elapsed: {:?}", start.elapsed()),
-				recv(timeout) -> _ => break,
-			}
-		};
-	});
-
-	*/
-
 	actor_system::start();
-
 }
 

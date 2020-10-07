@@ -38,29 +38,10 @@ impl Actor {
 		self.inbound_multi_producer.clone()
 	}
 
-	// // Give me a way to send messages TO the main thread
-	// pub fn get_receiver(&self) -> Receiver<MessageRequest>{
-	// 	self.outbound_single_consumer.clone()
-	// }
-
 	pub fn run(&self){
 		// this uses this to listen
 		let single_consumer_clone = self.inbound_single_consumer.clone();
 
-		// let outbound_multiproducer = self.outbound_multi_producer.clone();
-
-
-		/*
-
-			Instead of retaining state in the primary object, create it here, in the "temporal"
-			closure of the listen function then give it to the infinite comms loop. The main thread
-			doesn't need access to it. Main thread can send a message here if it wants to know what
-			it is.
-
-			Do other functions need access to the state? They won't have it unless it's passed via
-			message to/fro.
-
-		 */
 		let c_state = ActorState {
 			a_state:AtomicCell::new(State::Stopped),
 		};
@@ -69,7 +50,6 @@ impl Actor {
 			loop {
 				match single_consumer_clone.recv() {
 					Ok(m) => {
-						//println!("[listen] receive ok: {:?}", m);
 						match m {
 							MsgActor::Start => {
 								println!("[listen] received Message::Start");
@@ -82,15 +62,10 @@ impl Actor {
 							MsgActor::LogPrint(msg) => {
 								println!("[logging_actor] LogPrint: {}", &msg);
 							}
-							_ => {
-								println!("[pinger_actor] Message: Unknown" );
-							}
-
+							_ => {}
 						}
 					},
-					Err(_) => {
-						println!("[listen] receive error")
-					}
+					_ => {}
 				}
 			}
 		});
