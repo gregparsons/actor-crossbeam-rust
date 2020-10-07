@@ -11,11 +11,12 @@ pub struct Actor {
 	name:String,
 	inbound_multi_producer:crossbeam_channel::Sender<MsgActor>,
 	inbound_single_consumer:crossbeam_channel::Receiver<MsgActor>,
-	pub parent_tx:Sender<MsgActor>,
+	parent_tx:Sender<MsgActor>,
+	logger_tx:Sender<MsgActor>,
 }
 
 impl Actor {
-	pub fn new(actor_name:String, parent_tx_new: Sender<MsgActor>) -> Actor {
+	pub fn new(actor_name:String, parent_tx_new: Sender<MsgActor>, logger:Sender<MsgActor>) -> Actor {
 		let mut inbound_channel = crossbeam_channel::unbounded();
 		// let mut outbound_channel = crossbeam_channel::unbounded();
 		let new_actor = Actor {
@@ -26,7 +27,7 @@ impl Actor {
 			inbound_multi_producer: inbound_channel.0,
 			// talk to the operator on this:
 			parent_tx : parent_tx_new,
-			// logger_tx : logging_tx,
+			logger_tx : logger,
 		};
 		new_actor
 	}
@@ -46,11 +47,11 @@ impl Actor {
 
 		// ticker_tx needs to be available from outside the loop and outside the thread, rx gets
 		// cloned and moved inside the spawned thread to receive thread control messages
-		let ticker_channel = crossbeam_channel::unbounded();
-		let mut ticker_tx = ticker_channel.0;
-		// let mut ticker_rx = ticker_channel.1;
+		let (ticker_tx, ticker_rx) = crossbeam_channel::unbounded();
+		let logger_tx = self.logger_tx.clone();
 
 		let mut should_restart = true;
+
 		spawn(move ||{
 
 			// Restart HTTP Connection
@@ -65,16 +66,20 @@ impl Actor {
 					let url_pro = "wss://ws-feed.pro.coinbase.com".to_string(); // std::env::var("COINBASE_URL").expect("COINBASE_URL must be set");
 					let url = url_sandbox;
 
-					// TODO: confirm channels can't be reused when a thread dies if still have rx end
-					// get a new channel for a new thread
-					let ticker_channel = crossbeam_channel::unbounded();
-					ticker_tx = ticker_channel.0.clone();
-					// rx end of channel moves to ws thread
-					let ticker_rx = ticker_channel.1.clone();
-
 					// WebSocket Thread
-					let url_copy = url.clone();
-					std::thread::spawn(move || start_ticker_websocket(url_copy, ticker_rx));
+					// Copy stuff for the move into the thread
+					let url = url.clone();
+					let logger_tx = logger_tx.clone();
+					let ticker_rx = ticker_rx.clone();
+
+					// Spawn
+					std::thread::spawn(move ||
+						start_ticker_websocket(
+							url,
+							ticker_rx,
+							logger_tx
+						)
+					);
 
 					println!("[ticker_controller] spawned ticker_loop_thread, waiting for message...");
 				}
@@ -97,9 +102,14 @@ impl Actor {
 								should_restart = false;
 								return;
 							},
-							MsgActor::LogPrint(msg) => {
-								println!("[logging_actor] LogPrint: {}", &msg);
+							MsgActor::Pause => {
+								println!("[listen] received Message::Pause");
+								ticker_tx.send(MsgActor::Stop);
+								should_restart = false;
 							}
+							// MsgActor::LogPrint(msg) => {
+							// 	println!("[logging_actor] LogPrint: {}", &msg);
+							// }
 							_ => {}
 						}
 					},
@@ -111,7 +121,7 @@ impl Actor {
 	}
 }
 
-fn start_ticker_websocket(url:String, rx: Receiver<MsgActor>)->() {
+fn start_ticker_websocket(url:String, rx: Receiver<MsgActor>, logger: Sender<MsgActor>)->() {
 
 	fn generate_subscribe_message() -> json::JsonValue {
 
@@ -177,10 +187,9 @@ fn start_ticker_websocket(url:String, rx: Receiver<MsgActor>)->() {
 								Ok(ws_mesg) => {
 									match ws_mesg {
 										tungstenite::Message::Text(t) => {
-											println!("[ticker] {}", &t);
-
-											// TODO: insert to in-memory DB
-
+											// println!("[ticker] {}", &t);
+											// TODO: database here
+											logger.send(MsgActor::LogPrint(format!("[ticker via logger] {}", &t)));
 
 										},
 										_ => println!("[main] unknown socket message or something not text"),
@@ -188,17 +197,15 @@ fn start_ticker_websocket(url:String, rx: Receiver<MsgActor>)->() {
 								}
 							}
 
+
 							// Thread command and control
 
 							match rx.try_recv() {
 								Ok(MsgActor::Stop) => {
 									println!("[ticker] message: stop");
-									// break out of the loop, fall out of this function
-									// break;
 									return;
 								},
 								_ => {},
-
 							}
 						}
 					}

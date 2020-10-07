@@ -10,6 +10,7 @@ use std::thread::{spawn, sleep};
 pub enum MsgActor {
 	Start,
 	Stop,
+	Pause,
 	Ping,
 	Pong,
 	LogPrint(String),

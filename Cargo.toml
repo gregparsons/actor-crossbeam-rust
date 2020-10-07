@@ -1,5 +1,5 @@
 [package]
-name = "acteur"
+name = "ticker_04"
 version = "0.1.0"
 authors = ["GregP <github@swimr.com>"]
 edition = "2018"

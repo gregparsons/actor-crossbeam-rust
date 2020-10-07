@@ -31,10 +31,10 @@ pub fn start() -> () {
 	let (main_sender, main_consumer):(Sender<MsgActor>, Receiver<MsgActor>) = unbounded();
 
 	// // start a logging actor
-	// let logging_actor = crate::logging_actor::Actor::new("logger".to_string(), main_sender.clone());
-	// logging_actor.run();
+	let logging_actor = crate::logging_actor::Actor::new("logger".to_string(), main_sender.clone());
+	logging_actor.run();
 
-	let ticker_actor = crate::ticker_actor::Actor::new("ticker".to_string(), main_sender.clone() );
+	let ticker_actor = crate::ticker_actor::Actor::new("ticker".to_string(), main_sender.clone(), logging_actor.get_sender());
 	ticker_actor.run();
 
 	// // start pong actor
@@ -86,8 +86,12 @@ pub fn start() -> () {
 	// sleep(Duration::from_secs(5));
 	// pinger_actor.get_sender().send(MsgActor::Stop);
 	//logging_actor.get_sender().send(MsgActor::Stop);
+	ticker_actor.get_sender().send(MsgActor::Pause);
+	sleep(Duration::from_secs(10));
+	ticker_actor.get_sender().send(MsgActor::Start);
+	sleep(Duration::from_secs(15));
 	ticker_actor.get_sender().send(MsgActor::Stop);
-	sleep(Duration::from_secs(2));
+	sleep(Duration::from_secs(15));
 
 
 }
