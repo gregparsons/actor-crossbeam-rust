@@ -77,7 +77,7 @@ impl Actor {
 							},
 							MsgActor::Ping => {
 
-								use core::borrow::Borrow;
+								// use core::borrow::Borrow;
 								// println!("[listen] received Message::Ping; status {:?}",c_state.a_state.borrow().load());
 
 								// TODO: send a message back

@@ -1,3 +1,4 @@
+mod db_actor;
 mod actor_tools;
 mod ticker_actor;
 /**
@@ -30,6 +31,7 @@ mod actor;
 mod logging_actor;
 
 fn main() {
+	dotenv::dotenv().ok();
 	actor_system::start();
 }
 

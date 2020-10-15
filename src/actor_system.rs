@@ -29,21 +29,54 @@ pub fn start() -> () {
 	// Main Comms channel: only this "actor" can receive but there can be many copies given out to subordinates
 	let (main_sender, main_consumer):(Sender<MsgActor>, Receiver<MsgActor>) = crossbeam_channel::unbounded();
 
-	// // start a logging actor
+	// ********* Logging Consumer *********
 	let logging_actor = crate::logging_actor::Actor::new("logger".to_string(), main_sender.clone());
 	logging_actor.run();
 
 
+	// ********* Database Consumer *********
+	let db_actor = crate::db_actor::Actor::new(
+		"db-actor".to_string(),
+		main_sender.clone(),
+		logging_actor.get_sender(),
+	);
+	db_actor.run();
 
 
-	let url_sandbox = "wss://ws-feed-public.sandbox.pro.coinbase.com".to_string(); //std::env::var("COINBASE_URL").expect("COINBASE_URL must be set");
-	let url_pro = "wss://ws-feed.pro.coinbase.com".to_string(); // std::env::var("COINBASE_URL").expect("COINBASE_URL must be set");
+	// TODO: move to ticker_actor
+	// ********* Ticker Coinbase Consumer *********
+	// let url_sandbox = "wss://ws-feed-public.sandbox.pro.coinbase.com".to_string(); //std::env::var("COINBASE_URL").expect("COINBASE_URL must be set");
+	// let url_pro = "wss://ws-feed.pro.coinbase.com".to_string(); // std::env::var("COINBASE_URL").expect("COINBASE_URL must be set");
 
-	let ticker_actor = crate::ticker_actor::Actor::new("ticker_sand".to_string(), url_sandbox, main_sender.clone(), logging_actor.get_sender());
-	ticker_actor.run();
+	if let Ok(sandbox_url) = std::env::var("CB_WS_URL_SANDBOX"){
+		let ticker_actor = crate::ticker_actor::Actor::new(
+			"ticker_sand".to_string(),
+			sandbox_url,
+			false,
+			main_sender.clone(),
+			logging_actor.get_sender(),
+			db_actor.get_sender(),
+		);
+		ticker_actor.run();
+	}else{
+		println!("[ticker_actor.run] CB_WS_URL_SANDBOX env variable not found");
+	};
 
-	let ticker_actor = crate::ticker_actor::Actor::new("ticker_pro".to_string(), url_pro, main_sender.clone(), logging_actor.get_sender());
-	ticker_actor.run();
+	if let Ok(pro_url) = std::env::var("CB_WS_URL_PRO"){
+		let ticker_actor = crate::ticker_actor::Actor::new(
+			"ticker_sand".to_string(),
+			pro_url,
+			true,
+			main_sender.clone(),
+			logging_actor.get_sender(),
+			db_actor.get_sender(),
+		);
+		ticker_actor.run();
+	}else{
+		println!("[ticker_actor.run] CB_WS_URL_PRO env variable not found");
+	};
+
+
 
 
 	// // start pong actor
@@ -63,10 +96,11 @@ pub fn start() -> () {
 	// pinger_actor.run(true);
 
 	// Start Actor System listener thread
-	let rx_system: Receiver<MsgActor> = main_consumer.clone();
 	// let ping = pinger_actor.get_sender();
 	// let pong = ponger_actor.get_sender();
 	// let logger = logging_actor.get_sender();
+
+	let rx_system: Receiver<MsgActor> = main_consumer.clone();
 	spawn(move || {
 		loop {
 			match rx_system.recv() {
