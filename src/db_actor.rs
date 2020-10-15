@@ -270,68 +270,96 @@ fn db_write_ticker2(t:&Ticker2, c:&mut postgres::Client, is_pro:bool){
 	 */
 
 	let sql_option = if is_pro {
-		Some(format!("INSERT INTO coinbase_ticker(\
-			sequence,\
-			product_id, \
+		Some(format!("INSERT INTO t_cb_ticker(\
+			dtg, \
 			price, \
-			open_24h, \
 			volume_24h, \
+			sequence, \
+			product_id, \
+			side, \
+			open_24h, \
 			low_24h, \
 			high_24h, \
 			volume_30d, \
 			best_bid, \
 			best_ask, \
-			side, \
-			dtg, \
 			trade_id, \
 			last_size \
 		 ) values \
-		('{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}');",
+		('{}'::timestamp,'{}'::numeric(20,10),'{}'::numeric(20,10),'{}'::bigint,'{}'::varchar,'{}'::varchar,'{}'::numeric(20,10),'{}'::numeric(20,10),'{}'::numeric(20,10),'{}'::numeric(20,10),'{}'::numeric(20,10),'{}'::numeric(20,10),'{}'::bigint,'{}'::numeric(20,10));",
+			&t.time,
+			&t.price,
+			&t.volume_24h,
 			&t.sequence,
 			&t.product_id,
-			&t.price,
+			&t.side,
 			&t.open_24h,
-			&t.volume_24h,
 			&t.low_24h,
 			&t.high_24h,
 			&t.volume_30d,
 			&t.best_bid,
 			&t.best_ask,
-			&t.side,
-			&t.time,
 			&t.trade_id,
 			&t.last_size,
+	/*
+
+		create table if not exists t_cb_ticker_sand
+		(
+			id bigserial not null
+				constraint t_cb_ticker_sand_pkey
+					primary key,
+			dtg timestamp,
+			price numeric(20,10),
+			volume_24h numeric(20,10),
+			sequence bigint,
+			product_id varchar,
+			side varchar,
+			open_24h  numeric(20,10),
+			low_24h  numeric(20,10),
+			high_24h  numeric(20,10),
+			volume_30d  numeric(20,10),
+			best_bid numeric(20,10),
+			best_ask  numeric(20,10),
+			trade_id bigint,
+			last_size numeric(20,10)
+		);
+		alter table t_cb_ticker_sand owner to postgres;
+
+	 */
+
+
+
 		))
 	}else{
-		Some(format!("INSERT INTO coinbase_ticker_sandbox(\
-			sequence,\
-			product_id, \
+		Some(format!("INSERT INTO t_cb_ticker_sand(\
+			dtg, \
 			price, \
-			open_24h, \
 			volume_24h, \
+			sequence, \
+			product_id, \
+			side, \
+			open_24h, \
 			low_24h, \
 			high_24h, \
 			volume_30d, \
 			best_bid, \
 			best_ask, \
-			side, \
-			dtg, \
 			trade_id, \
 			last_size \
 		 ) values \
-		('{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}');",
+		('{}'::timestamp,'{}'::numeric(20,10),'{}'::numeric(20,10),'{}'::bigint,'{}'::varchar,'{}'::varchar,'{}'::numeric(20,10),'{}'::numeric(20,10),'{}'::numeric(20,10),'{}'::numeric(20,10),'{}'::numeric(20,10),'{}'::numeric(20,10),'{}'::bigint,'{}'::numeric(20,10));",
+			 &t.time,
+			 &t.price,
+			 &t.volume_24h,
 			 &t.sequence,
 			 &t.product_id,
-			 &t.price,
+			 &t.side,
 			 &t.open_24h,
-			 &t.volume_24h,
 			 &t.low_24h,
 			 &t.high_24h,
 			 &t.volume_30d,
 			 &t.best_bid,
 			 &t.best_ask,
-			 &t.side,
-			 &t.time,
 			 &t.trade_id,
 			 &t.last_size,
 		))	};
